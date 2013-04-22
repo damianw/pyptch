@@ -98,10 +98,6 @@ class PtchUser:
 		userid = int(decoded[near:far])
 		return userid
 
-	def follow_async(self, userid):
-		thread = threading.Thread(target = self.follow, args = (userid,))
-		thread.start()
-
 	def follow(self, userid):
 		postdata = '{"follow_user_id": "' + str(userid) + '"}'
 		response = self.session.post(self.USER_URL + str(self.user_id) + self.FOLLOW_SUFFIX,
@@ -114,18 +110,10 @@ class PtchUser:
 		if response.status_code != 200: return False
 		return True
 
-	def set_thumbnail_async(self, mfile):
-		thread = threading.Thread(target = self.set_thumbnail, args = (mfile,))
-		thread.start()
-
 	def set_thumbnail_url(self, url):
 		imgr = requests.get(url)
 		mfile = dict(file=('image' + url[url.rfind('.'):], imgr.content))
 		self.set_thumbnail(mfile)
-
-	def set_thumbnail_url_async(self, url):
-		thread = threading.Thread(target = self.set_thumbnail_url, args = (url,))
-		thread.start()
 
 	@staticmethod
 	def resolve_userid(display_name):
