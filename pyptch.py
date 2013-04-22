@@ -26,12 +26,13 @@ class PtchUser:
 		'invitation_email': 'None',
 		'invitation_code': 'None' }
 
+	USER_FIELDS = ['likes', 'friends', 'followers', 'ptches']
+	COMMUNITY_FIELDS = ['list']
+
 	user_id = None
 	session = None
 	attributes = None
 	logged_in = False
-	followers = None
-	friends = None
 
 	def __init__(self, email, password):
 		self.logged_in = False
@@ -67,17 +68,19 @@ class PtchUser:
 	def update(self):
 		self.user_id = self.get_user_id()
 		uurl = self.USER_URL + str(self.user_id)
-		frurl = uurl + self.FRIENDS_SUFFIX
-		fourl = uurl + self.FOLLOWERS_SUFFIX
-		lurl = uurl + self.LIKES_SUFFIX
-		purl = uurl + self.PTCHES_SUFFIX
-		curl = COMMUNITY_URL + LIST_SUFFIX
-		self.friends = self.session.get(frurl).json()
-		self.followers = self.session.get(fourl).json()
+		curl = self.COMMUNITY_URL + self.LIST_SUFFIX
 		self.attributes = self.session.get(uurl).json()
-		self.likes = self.session.get(lurl).json()
-		self.ptches = self.session.get(purl).json()
 		self.community = self.session.get(curl).json()
+
+	def get_user_data(self, field, **params):
+		if field not in self.USER_FIELDS: 
+			raise PtchError("No such field: " + field, None)
+		url = self.USER_URL + str(self.user_id) + '/' + field
+		print(url)
+		return self.get_json(url, **params)
+
+	def get_json(self, url, **params):
+		return self.session.get(url, params = params).json()
 
 	def get_user_id(self): 
 		encoded = None
