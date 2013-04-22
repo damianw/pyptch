@@ -43,22 +43,22 @@ class PtchUser:
 		ldata = {'signin_email': email, 'signin_password': password,
 		 'signin_submit': 'Login'}
 		r = self.session.post(self.SIGNIN_URL, data = ldata)
-		self.update_helper()
+		self.update()
 		self.logged_in = True
 
 	def logout(self):
 		if self.logged_in: self.session.get(self.SIGNOUT_URL)
 		self.logged_in = False
 
-	def update(self):
-		thread = threading.Thread(target = self.update_helper)
+	def update_async(self):
+		thread = threading.Thread(target = self.update)
 		thread.start()
 
-	def update_helper(self):
-		self.userid = self.get_user_id()
+	def update(self):
+		self.userid = self.get_userid()
 		self.attributes = self.session.get(self.USER_URL + str(self.userid)).json()
 
-	def get_user_id(self): 
+	def get_userid(self): 
 		soup = BeautifulSoup(self.session.get(self.STREAM_URL).text)
 		try:
 			index = soup.text.find('_current_user_id')
@@ -67,29 +67,34 @@ class PtchUser:
 			raise PtchError('Not logged in or login failure.', None)
 		return int(soup.text[index:endindex].split()[2])
 
-	#follow() is multithreaded. take that bitches
-	def follow(self, userid):
-		thread = threading.Thread(target = self.follow_helper, args = (userid,))
+	def follow_async(self, userid):
+		thread = threading.Thread(target = self.follow, args = (userid,))
 		thread.start()
 
-	def follow_helper(self, userid):
+	def follow(self, userid):
 		postdata = '{"follow_user_id": "' + str(userid) + '"}'
 		response = self.session.post(self.USER_URL + str(self.userid) + self.FOLLOW_SUFFIX,
 			data = postdata)
-		if response.status_code != 200:	raise PtchError("Failed to follow " + str(userid), response)
+		if response.status_code != 200:	return False
+		return True
 
-	def set_thubmnail_helper(self, mfile):
+	def set_thubmnail(self, mfile):
 		response = self.session.post(self.THUMBNAIL_URL, files = mfile)
-		if response.status_code != 200: raise PtchError("Could not update thumbnail.", response)
+		if response.status_code != 200: return False
+		return True
 
-	def set_thumbnail(self, mfile):
-		thread = threading.Thread(target = self.set_thumbnail_helper, args = (mfile,))
+	def set_thumbnail_async(self, mfile):
+		thread = threading.Thread(target = self.set_thumbnail, args = (mfile,))
 		thread.start()
 
 	def set_thumbnail_url(self, url):
 		imgr = requests.get(url)
 		mfile = dict(file=('image' + url[url.rfind('.'):], imgr.content))
 		self.set_thumbnail(mfile)
+
+	def set_thumbnail_url_async(self, url):
+		thread = threading.Thread(target = self.set_thumbnail_url, args = (url,))
+		thread.start()
 
 class PtchError(Exception):
 	def __init__(self, value, response):
