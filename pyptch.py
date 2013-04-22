@@ -1,5 +1,7 @@
 import requests
 import threading
+import string
+import base64
 from bs4 import BeautifulSoup
 
 class PtchUser:
@@ -10,6 +12,12 @@ class PtchUser:
 	THUMBNAIL_URL = "http://ptch.com/v1/user/thumbnail"
 	SIGNIN_URL = 'https://ptch.com/login'
 	SIGNOUT_URL = 'https://ptch.com/signout'
+	COMMUNITY_URL = 'http://ptch.com/v1/community'
+	LIST_SUFFIX = '/list'
+	FRIENDS_SUFFIX = '/friends'
+	FOLLOWERS_SUFFIX = '/followers'
+	LIKES_SUFFIX = '/likes'
+	PTCHES_SUFFIX = '/ptchs'
 
 	REGISTER_TEMPLATE = {
 		'full_name': 'None',
@@ -18,10 +26,12 @@ class PtchUser:
 		'invitation_email': 'None',
 		'invitation_code': 'None' }
 
-	userid = None
+	user_id = None
 	session = None
 	attributes = None
 	logged_in = False
+	followers = None
+	friends = None
 
 	def __init__(self, email, password):
 		self.logged_in = False
@@ -55,17 +65,35 @@ class PtchUser:
 		thread.start()
 
 	def update(self):
-		self.userid = self.get_userid()
-		self.attributes = self.session.get(self.USER_URL + str(self.userid)).json()
+		self.user_id = self.get_user_id()
+		uurl = self.USER_URL + str(self.user_id)
+		frurl = uurl + self.FRIENDS_SUFFIX
+		fourl = uurl + self.FOLLOWERS_SUFFIX
+		lurl = uurl + self.LIKES_SUFFIX
+		purl = uurl + self.PTCHES_SUFFIX
+		curl = COMMUNITY_URL + LIST_SUFFIX
+		self.friends = self.session.get(frurl).json()
+		self.followers = self.session.get(fourl).json()
+		self.attributes = self.session.get(uurl).json()
+		self.likes = self.session.get(lurl).json()
+		self.ptches = self.session.get(purl).json()
+		self.community = self.session.get(curl).json()
 
-	def get_userid(self): 
-		soup = BeautifulSoup(self.session.get(self.STREAM_URL).text)
-		try:
-			index = soup.text.find('_current_user_id')
-			endindex = soup.text.find(';', index)
-		except IndexError as e:
-			raise PtchError('Not logged in or login failure.', None)
-		return int(soup.text[index:endindex].split()[2])
+	def get_user_id(self): 
+		encoded = None
+		for cookie in self.session.cookies:
+			if cookie.name == 'ptch_sec_tkt':
+				encoded = cookie.value
+				break
+		if encoded is None: raise PtchError('Not logged in.', None)
+		decoded = base64.b64decode(encoded)
+		decoded = ''.join(chr(s) for s in decoded if chr(s) in string.printable)
+		far = decoded.rfind('|')
+		near = far - 5
+		#TODO fix this so that we can find this not-stupidly... help?
+		#near = decoded.rfind('~', 0, far) + 1
+		userid = int(decoded[near:far])
+		return userid
 
 	def follow_async(self, userid):
 		thread = threading.Thread(target = self.follow, args = (userid,))
@@ -73,7 +101,7 @@ class PtchUser:
 
 	def follow(self, userid):
 		postdata = '{"follow_user_id": "' + str(userid) + '"}'
-		response = self.session.post(self.USER_URL + str(self.userid) + self.FOLLOW_SUFFIX,
+		response = self.session.post(self.USER_URL + str(self.user_id) + self.FOLLOW_SUFFIX,
 			data = postdata)
 		if response.status_code != 200:	return False
 		return True
@@ -95,6 +123,10 @@ class PtchUser:
 	def set_thumbnail_url_async(self, url):
 		thread = threading.Thread(target = self.set_thumbnail_url, args = (url,))
 		thread.start()
+
+	@staticmethod
+	def resolve_userid(display_name):
+		pass
 
 class PtchError(Exception):
 	def __init__(self, value, response):
